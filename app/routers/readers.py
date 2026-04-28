@@ -3,6 +3,8 @@ from sqlalchemy.orm import Session
 from app.database import get_db
 from app.models.reader import Reader
 from app.schemas import ReaderCreate, ReaderResponse
+from app.auth import get_current_user
+from app.models.user import User
 from typing import List
 
 router = APIRouter(prefix="/readers", tags=["readers"])
@@ -22,7 +24,7 @@ def get_reader(reader_id: int, db: Session = Depends(get_db)):
 
 
 @router.post("/", response_model=ReaderResponse, status_code=201)
-def create_reader(reader_data: ReaderCreate, db: Session = Depends(get_db)):
+def create_reader(reader_data: ReaderCreate, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     existing = db.query(Reader).filter(Reader.email == reader_data.email).first()
     if existing:
         raise HTTPException(status_code=400, detail="Читатель с таким email уже существует")

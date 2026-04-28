@@ -3,6 +3,8 @@ from sqlalchemy.orm import Session
 from app.database import get_db
 from app.models.book import Book
 from app.schemas import BookCreate, BookResponse
+from app.auth import get_current_user
+from app.models.user import User
 from typing import List
 
 router = APIRouter(prefix="/books", tags=["books"])
@@ -22,7 +24,7 @@ def get_book(book_id: int, db: Session = Depends(get_db)):
 
 
 @router.post("/", response_model=BookResponse, status_code=201)
-def create_book(book_data: BookCreate, db: Session = Depends(get_db)):
+def create_book(book_data: BookCreate, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     # Проверяем уникальность ISBN если он передан
     if book_data.isbn:
         existing = db.query(Book).filter(Book.isbn == book_data.isbn).first()

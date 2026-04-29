@@ -1,5 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
+from sqlalchemy import func
 from app.database import get_db
 from app.models.book import Book
 from app.schemas import BookCreate, BookResponse, BorrowResponse
@@ -13,8 +14,9 @@ router = APIRouter(prefix="/books", tags=["books"])
 @router.get("/", response_model=List[BookResponse])
 def get_books(search: str = "", db: Session = Depends(get_db)):
     if search:
+        q = search.lower()
         return db.query(Book).filter(
-            Book.title.ilike(f"%{search}%") | Book.author.ilike(f"%{search}%")
+            func.lower(Book.title).contains(q) | func.lower(Book.author).contains(q)
         ).all()
     return db.query(Book).all()
 
@@ -23,8 +25,9 @@ def get_books(search: str = "", db: Session = Depends(get_db)):
 @router.get("/search/", response_model=List[BookResponse])
 def search_books(q: str, db: Session = Depends(get_db)):
     """Поиск книг по названию или автору"""
+    query = q.lower()
     return db.query(Book).filter(
-        Book.title.ilike(f"%{q}%") | Book.author.ilike(f"%{q}%")
+        func.lower(Book.title).contains(query) | func.lower(Book.author).contains(query)
     ).all()
 
 

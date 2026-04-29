@@ -16,23 +16,19 @@ router = APIRouter(prefix="/borrow", tags=["borrow"])
 def borrow_book(
     borrow_data: BorrowCreate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)  # защищаем JWT
+    current_user: User = Depends(get_current_user)
 ):
-    # Проверяем что книга существует
     book = db.query(Book).filter(Book.id == borrow_data.book_id).first()
     if not book:
         raise HTTPException(status_code=404, detail="Книга не найдена")
 
-    # Проверяем что читатель существует
     reader = db.query(Reader).filter(Reader.id == borrow_data.reader_id).first()
     if not reader:
         raise HTTPException(status_code=404, detail="Читатель не найден")
 
-    # Бизнес-логика 1: проверяем наличие экземпляров
     if book.copies < 1:
         raise HTTPException(status_code=400, detail="Нет доступных экземпляров книги")
 
-    # Бизнес-логика 2: читатель не может взять более 3 книг
     active_borrows = db.query(BorrowedBook).filter(
         BorrowedBook.reader_id == borrow_data.reader_id,
         BorrowedBook.return_date == None  # noqa: E711
@@ -40,10 +36,8 @@ def borrow_book(
     if active_borrows >= 3:
         raise HTTPException(status_code=400, detail="Читатель уже взял максимальное количество книг (3)")
 
-    # Уменьшаем количество экземпляров
     book.copies -= 1
 
-    # Создаём запись о выдаче
     borrow = BorrowedBook(
         book_id=borrow_data.book_id,
         reader_id=borrow_data.reader_id
@@ -58,9 +52,8 @@ def borrow_book(
 def return_book(
     borrow_data: BorrowCreate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)  # защищаем JWT
+    current_user: User = Depends(get_current_user)
 ):
-    # Бизнес-логика 3: ищем активную выдачу
     borrow = db.query(BorrowedBook).filter(
         BorrowedBook.book_id == borrow_data.book_id,
         BorrowedBook.reader_id == borrow_data.reader_id,
@@ -73,11 +66,9 @@ def return_book(
             detail="Эта книга не была выдана этому читателю или уже возвращена"
         )
 
-    # Увеличиваем количество экземпляров
     book = db.query(Book).filter(Book.id == borrow_data.book_id).first()
     book.copies += 1
 
-    # Проставляем дату возврата
     from datetime import datetime
     borrow.return_date = datetime.utcnow()
 
@@ -90,7 +81,7 @@ def return_book(
 def get_active_borrows(
     reader_id: int,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)  # защищаем JWT
+    current_user: User = Depends(get_current_user)
 ):
     """Список всех книг которые читатель взял и ещё не вернул"""
     reader = db.query(Reader).filter(Reader.id == reader_id).first()
@@ -102,3 +93,23 @@ def get_active_borrows(
         BorrowedBook.return_date == None  # noqa: E711
     ).all()
     return borrows
+
+
+@router.get("/history/", dependencies=[Depends(get_current_user)])
+def get_history(db: Session = Depends(get_db)):
+    """Полная история всех выдач"""
+    borrows = db.query(BorrowedBook).all()
+
+    result = []
+    for b in borrows:
+        book = db.query(Book).filter(Book.id == b.book_id).first()
+        reader = db.query(Reader).filter(Reader.id == b.reader_id).first()
+        result.append({
+            "id": b.id,
+            "book_title": book.title if book else "—",
+            "reader_name": reader.name if reader else "—",
+            "borrow_date": b.borrow_date,
+            "return_date": b.return_date
+        })
+
+    return result

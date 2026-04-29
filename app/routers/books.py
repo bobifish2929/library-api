@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from app.database import get_db
 from app.models.book import Book
-from app.schemas import BookCreate, BookResponse
+from app.schemas import BookCreate, BookResponse, BorrowResponse
 from app.auth import get_current_user
 from app.models.user import User
 from typing import List
@@ -59,4 +59,23 @@ def delete_book(book_id: int, db: Session = Depends(get_db)):
         raise HTTPException(status_code=404, detail="Книга не найдена")
     
     db.delete(book)
+
+
+@router.get("/search/", response_model=List[BookResponse])
+def search_books(q: str, db: Session = Depends(get_db)):
+    """Поиск книг по названию или автору"""
+    return db.query(Book).filter(
+        Book.title.ilike(f"%{q}%") | Book.author.ilike(f"%{q}%")
+    ).all()
+
+
+@router.get("/{book_id}/history", response_model=List[BorrowResponse])
+def get_book_history(book_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    """История всех выдач конкретной книги"""
+    book = db.query(Book).filter(Book.id == book_id).first()
+    if not book:
+        raise HTTPException(status_code=404, detail="Книга не найдена")
+
+    from app.models.borrowed import BorrowedBook
+    return db.query(BorrowedBook).filter(BorrowedBook.book_id == book_id).all()
     db.commit()

@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 from app.database import engine, Base
 from app import models  # noqa: F401
-from app.routers import books, readers, auth, borrow
+from app.routers import books, readers, auth, borrow, stats
 
 app = FastAPI(title="Library API")
 
@@ -11,6 +11,7 @@ app.include_router(auth.router)
 app.include_router(books.router)
 app.include_router(readers.router)
 app.include_router(borrow.router)
+app.include_router(stats.router)
 
 @app.get("/")
 def root():
